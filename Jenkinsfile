@@ -4,8 +4,12 @@ pipeline {
         choice(name: 'Environment', choices: ['Dev', 'Prod'], description: 'Select the environment to deploy')
     }
     environment {
-        ARTIFACTORY_REPO = "java-project-repo"
+        ARTIFACTORY_REPO = "tomcat-java"
         ARTIFACTORY_SERVER_ID = 'Artifactory'
+        TOMCAT_DEV_PORT = '8085'
+        TOMCAT_PROD_PORT = '8086'
+        TOMCAT_DEV_PATH = '/opt/tomcat-dev/webapps'
+        TOMCAT_PROD_PATH = '/opt/tomcat-prod/webapps'
     }
     tools {
         maven 'Maven3'
@@ -14,24 +18,17 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 script {
-                     if (currentBuild.rawBuild.getCause(hudson.model.Cause$UserIdCause)) {
-                     
+                    if (currentBuild.rawBuild.getCause(hudson.model.Cause$UserIdCause)) {
                         echo "Pipeline triggered manually. Branch: ${params.Environment}"
                         env.BRANCH_NAME = params.Environment
-                        env.DOCKER_IMAGE = "hacktom007/hello-world-springboot-${params.Environment.toLowerCase()}:${env.BUILD_ID}"
-                        env.APP_PORT = "${params.Environment == 'Dev' ? '8083' : '8084'}"
                     } else if (env.GIT_BRANCH) {
-                      
                         echo "Pipeline triggered by webhook. Branch: ${env.GIT_BRANCH}"
                         env.BRANCH_NAME = env.GIT_BRANCH.replace("origin/", "")
-                        env.DOCKER_IMAGE = "hacktom007/hello-world-springboot-${env.BRANCH_NAME.toLowerCase()}:${env.BUILD_ID}"
-                        env.APP_PORT = "${env.BRANCH_NAME == 'Dev' ? '8083' : '8084'}"
                     } else {
                         error "Unable to detect the branch. Please verify the configuration."
                     }
                     
                     echo "Checking out branch: ${env.BRANCH_NAME}"
-                    // Checkout the code based on the dynamically set branch
                     git branch: "${env.BRANCH_NAME}", url: 'https://github.com/ParthSharmaT/Hello_world_java_springboot_docker.git'
                 }
             }
@@ -53,10 +50,10 @@ pipeline {
             steps {
                 script {
                     withSonarQubeEnv('Sonar') {
-                        sh "mvn clean verify sonar:sonar -Dsonar.projectKey=JenkinsProject -Dsonar.projectName='JenkinsProject'"
+                        sh "mvn clean verify sonar:sonar -Dsonar.projectKey=tomcat-java -Dsonar.projectName='tomcat-java'"
                         sh "mvn sonar:sonar \
-                        -Dsonar.projectKey=JenkinsProject \
-                        -Dsonar.projectName='JenkinsProject' \
+                        -Dsonar.projectKey=tomcat-java \
+                        -Dsonar.projectName='tomcat-java' \
                         -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml"
                     }
                 }
@@ -67,7 +64,7 @@ pipeline {
                 rtUpload serverId: env.ARTIFACTORY_SERVER_ID, spec: '''{
                     "files": [
                         {
-                            "pattern": "target/*.jar",
+                            "pattern": "target/*.war",
                             "target": "${ARTIFACTORY_REPO}/"
                         }
                     ]
@@ -75,30 +72,20 @@ pipeline {
                 rtPublishBuildInfo serverId: env.ARTIFACTORY_SERVER_ID
             }
         }
-        stage('Build Docker Image') {
-            steps {
-                sh 'docker build -t $DOCKER_IMAGE .'
-            }
-        }
-        stage('Push Docker Image') {
-            steps {
-                withDockerRegistry([credentialsId: 'docker-hub-credentials', url: 'https://index.docker.io/v1/']) {
-                    sh 'docker push $DOCKER_IMAGE'
-                }
-            }
-        }
-       stage('Deploy Application') {
+        stage('Deploy to Tomcat') {
             steps {
                 script {
-                    def containerName = "hello-world-${env.BRANCH_NAME.toLowerCase()}"
+                    def tomcatPort = env.BRANCH_NAME == 'Dev' ? env.TOMCAT_DEV_PORT : env.TOMCAT_PROD_PORT
+                    def tomcatPath = env.BRANCH_NAME == 'Dev' ? env.TOMCAT_DEV_PATH : env.TOMCAT_PROD_PATH
+                    def warFile = "target/*.war"
                     sh """
-                    if [ \$(docker ps -a -q --filter "name=${containerName}") ]; then
-                        echo "Stopping and removing existing container: ${containerName}"
-                        docker stop ${containerName} || true
-                        docker rm ${containerName} || true
+                    if [ -d "${tomcatPath}/ROOT" ] || [ -f "${tomcatPath}/ROOT.war" ]; then
+                        echo "Stopping the existing default application on Tomcat"
+                        rm -rf ${tomcatPath}/ROOT*
                     fi
                     
-                    docker run -d --name ${containerName} -p ${APP_PORT}:${APP_PORT} $DOCKER_IMAGE --server.port=${APP_PORT}
+                    echo "Deploying application as the default application on Tomcat"
+                    cp ${warFile} ${tomcatPath}/ROOT.war
                     """
                 }
             }
@@ -107,7 +94,7 @@ pipeline {
     }
     post {
         success {
-            emailext body: "The ${env.BRANCH_NAME} environment has been successfully deployed.\\nURL: http://4.240.109.238:8084:${APP_PORT}",
+            emailext body: "The ${env.BRANCH_NAME} environment has been successfully deployed to Tomcat.\\nURL: http://4.240.109.238/:${env.BRANCH_NAME == 'Dev' ? env.TOMCAT_DEV_PORT : env.TOMCAT_PROD_PORT}",
                      subject: "Jenkins Pipeline: ${env.BRANCH_NAME} Deployment Successful",
                      to: 'parthsharmatanguriya@gmail.com',
                      recipientProviders: [[$class: 'DevelopersRecipientProvider'], [$class: 'RequesterRecipientProvider']]

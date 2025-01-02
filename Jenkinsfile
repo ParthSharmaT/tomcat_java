@@ -94,7 +94,7 @@ pipeline {
     }
     post {
         success {
-            emailext body: "The ${env.BRANCH_NAME} environment has been successfully deployed to Tomcat.\\nURL: http://4.240.109.238/:${env.BRANCH_NAME == 'Dev' ? env.TOMCAT_DEV_PORT : env.TOMCAT_PROD_PORT}",
+            emailext body: "The ${env.BRANCH_NAME} environment has been successfully deployed to Tomcat.\\nURL: http://4.240.109.238:${env.BRANCH_NAME == 'Dev' ? env.TOMCAT_DEV_PORT : env.TOMCAT_PROD_PORT}",
                      subject: "Jenkins Pipeline: ${env.BRANCH_NAME} Deployment Successful",
                      to: 'parthsharmatanguriya@gmail.com',
                      recipientProviders: [[$class: 'DevelopersRecipientProvider'], [$class: 'RequesterRecipientProvider']]

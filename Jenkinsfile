@@ -29,7 +29,7 @@ pipeline {
                     }
                     
                     echo "Checking out branch: ${env.BRANCH_NAME}"
-                    git branch: "${env.BRANCH_NAME}", url: 'https://github.com/ParthSharmaT/Hello_world_java_springboot_docker.git'
+                    git branch: "${env.BRANCH_NAME}", url: 'https://github.com/ParthSharmaT/tomcat_java.git'
                 }
             }
         }

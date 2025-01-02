@@ -81,11 +81,11 @@ pipeline {
                     sh """
                     if [ -d "${tomcatPath}/ROOT" ] || [ -f "${tomcatPath}/ROOT.war" ]; then
                         echo "Stopping the existing default application on Tomcat"
-                        rm -rf ${tomcatPath}/ROOT*
+                        sudo rm -rf ${tomcatPath}/ROOT*
                     fi
                     
                     echo "Deploying application as the default application on Tomcat"
-                    cp ${warFile} ${tomcatPath}/ROOT.war
+                    sudo cp ${warFile} ${tomcatPath}/ROOT.war
                     """
                 }
             }

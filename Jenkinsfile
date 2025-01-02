@@ -29,7 +29,7 @@ pipeline {
                     }
                     
                     echo "Checking out branch: ${env.BRANCH_NAME}"
-                    git branch: "${env.BRANCH_NAME}", url: 'https://github.com/ParthSharmaT/tomcat_java.git.git'
+                    git branch: "${env.BRANCH_NAME}", url: 'https://github.com/ParthSharmaT/tomcat_java.git'
                 }
             }
         }
